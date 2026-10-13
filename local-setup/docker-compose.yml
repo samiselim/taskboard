@@ -1,0 +1,71 @@
+# Local development environment for TaskBoard
+#   docker compose up --build                 -> app on http://localhost:3000
+#   docker compose --profile sonar up -d      -> + SonarQube on http://localhost:9000
+name: taskboard
+
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: taskboard
+      POSTGRES_USER: taskboard
+      POSTGRES_PASSWORD: taskboard-local-only
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U taskboard -d taskboard"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build:
+      context: ../app/backend
+      args:
+        APP_VERSION: local
+    environment:
+      ENVIRONMENT: local-compose
+      CORS_ORIGINS: http://localhost:3000   # lets `npm run dev` call the API directly
+      DB_HOST: db
+      DB_NAME: taskboard
+      DB_USER: taskboard
+      DB_PASSWORD: taskboard-local-only
+    ports:
+      - "8000:8000"   # API docs: http://localhost:8000/api/docs
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health/ready')"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # Static export served by nginx, which also proxies /api to the backend
+  # (exactly what CloudFront does in AWS)
+  frontend:
+    build:
+      context: ../app/frontend
+      args:
+        NEXT_PUBLIC_APP_VERSION: local
+    environment:
+      BACKEND_URL: http://backend:8000
+    ports:
+      - "3000:8080"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  sonarqube:
+    image: sonarqube:community
+    profiles: ["sonar"]
+    ports:
+      - "9000:9000"
+    volumes:
+      - sonar-data:/opt/sonarqube/data
+      - sonar-extensions:/opt/sonarqube/extensions
+
+volumes:
+  db-data:
+  sonar-data:
+  sonar-extensions:

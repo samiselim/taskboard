@@ -1,0 +1,15 @@
+# Headless service: gives the StatefulSet pod a stable DNS name (<release>-postgres-0.<release>-postgres)
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "taskboard.databaseHost" . }}
+  labels:
+    {{- include "taskboard.labels" . | nindent 4 }}
+spec:
+  clusterIP: None
+  selector:
+    {{- include "taskboard.database.selector" . | nindent 4 }}
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres

@@ -1,0 +1,28 @@
+# Argo CD Application: deploy the TaskBoard Helm chart with values-local.yaml.
+#
+# Argo CD watches the folder "deploy/helm/taskboard" on the branch "main" of your repo.
+# When a file there changes (e.g. the image tag in values-local.yaml), Argo CD renders the
+# chart again and applies ONLY the Kubernetes objects that changed.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: taskboard
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/CHANGE_ME/taskboard.git   # your repository
+    targetRevision: main
+    path: deploy/helm/taskboard
+    helm:
+      valueFiles:
+        - values-local.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: taskboard
+  syncPolicy:
+    automated:
+      prune: true      # something removed from Git is removed from the cluster
+      selfHeal: true   # a manual change in the cluster (kubectl edit/scale) is undone
+    syncOptions:
+      - CreateNamespace=true

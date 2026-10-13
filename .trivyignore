@@ -1,0 +1,16 @@
+# Accepted risks for Trivy (read automatically from the repository root by trivy-action).
+# They concern the Terraform code in infra/.
+# Every entry needs a reason. Review this list when the architecture changes.
+
+# The backend ALB is internet-facing, but its security group only accepts CloudFront's
+# IP ranges (AWS-managed prefix list) and the listener only forwards requests that carry
+# the secret X-Origin-Verify header. Improvement: CloudFront VPC origins + internal ALB.
+AWS-0053
+
+# CloudFront -> ALB uses HTTP because the project has no custom domain/ACM certificate.
+# Viewer -> CloudFront is HTTPS. Improvement: custom domain + ACM certificate on the ALB.
+AWS-0054
+
+# The Terraform state bucket uses SSE-S3 (AES256) instead of a customer-managed KMS key.
+# Acceptable for a lab; a company would use SSE-KMS with its own key.
+AWS-0132

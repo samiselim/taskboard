@@ -1,0 +1,16 @@
+{{- if .Values.targetGroupBinding.enabled }}
+# EKS only: the AWS Load Balancer Controller registers the backend pod IPs
+# in the ALB target group that Terraform created (CloudFront -> ALB -> pods).
+apiVersion: elbv2.k8s.aws/v1beta1
+kind: TargetGroupBinding
+metadata:
+  name: {{ include "taskboard.fullname" . }}-backend
+  labels:
+    {{- include "taskboard.labels" . | nindent 4 }}
+spec:
+  serviceRef:
+    name: {{ include "taskboard.fullname" . }}-backend
+    port: {{ .Values.backend.service.port }}
+  targetGroupARN: {{ required "targetGroupBinding.targetGroupARN is required" .Values.targetGroupBinding.targetGroupARN }}
+  targetType: ip
+{{- end }}

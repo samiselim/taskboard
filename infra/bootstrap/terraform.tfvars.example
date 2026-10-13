@@ -1,0 +1,3 @@
+region            = "eu-west-1"
+github_repository = "your-github-user/taskboard"
+state_bucket_name = "taskboard-tfstate-123456789012"

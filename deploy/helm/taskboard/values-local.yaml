@@ -1,0 +1,32 @@
+# Local values (minikube), used by local-setup/minikube/up.sh and gitops/applications/taskboard-local.yaml.
+# Compare with values-prod.yaml: same chart, different values.
+backend:
+  image:
+    repository: taskboard-backend
+    tag: local
+    pullPolicy: Never      # the image is loaded into minikube by up.sh, not pulled from a registry
+  replicas: 1
+  environment: minikube
+
+frontend:
+  enabled: true            # local only: on AWS, S3 + CloudFront serve the frontend
+  image:
+    repository: taskboard-frontend
+    tag: local
+    pullPolicy: Never      # loaded into minikube by up.sh
+
+database:
+  storage:
+    size: 1Gi
+    storageClassName: ""   # minikube's default StorageClass ("standard")
+
+secret:
+  create: true             # local only: the chart creates the Secret
+  username: taskboard
+  password: taskboard-local-only
+
+externalSecret:
+  enabled: false           # no AWS Secrets Manager locally
+
+targetGroupBinding:
+  enabled: false           # no ALB locally

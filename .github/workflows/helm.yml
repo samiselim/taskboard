@@ -1,0 +1,51 @@
+name: Helm & GitOps
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "deploy/**"
+      - "gitops/**"
+      - ".github/workflows/helm.yml"
+  push:
+    branches: [main]
+    paths:
+      - "deploy/**"
+      - "gitops/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read # Gitleaks lists the commits of the pull request
+
+jobs:
+  validate:
+    name: Lint, render & scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # the secret scanners read the commits
+
+      - uses: azure/setup-helm@v5
+
+      - name: Lint the chart (local + production values)
+        run: |
+          helm lint deploy/helm/taskboard -f deploy/helm/taskboard/values-local.yaml
+          helm lint deploy/helm/taskboard -f deploy/helm/taskboard/values-prod.yaml
+
+      - name: Render the production manifests
+        run: |
+          helm template taskboard deploy/helm/taskboard \
+            -f deploy/helm/taskboard/values-prod.yaml > rendered-prod.yaml
+          echo "Rendered $(grep -c '^kind:' rendered-prod.yaml) Kubernetes objects"
+
+      - name: Check the Argo CD Application files
+        run: yq -e '.' gitops/applications/*.yaml > /dev/null
+
+      - name: Pre-build scan (chart + manifests)
+        uses: ./.github/actions/pre-build-scan
+        with:
+          working-directory: deploy
+          report-name: helm-pre-build-scan

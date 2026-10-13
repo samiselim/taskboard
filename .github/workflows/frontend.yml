@@ -1,0 +1,74 @@
+name: Frontend
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "app/frontend/**"
+      - ".github/workflows/frontend.yml"
+      - ".github/actions/**"
+  push:
+    branches: [main]
+    paths:
+      - "app/frontend/**"
+      - ".github/workflows/frontend.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read # Gitleaks lists the commits of the pull request
+
+concurrency:
+  group: frontend-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build-and-scan:
+    name: Pre-build scan, build & post-build scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: app/frontend
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # Scan the sources BEFORE npm installs node_modules
+      - name: Pre-build scan
+        uses: ./.github/actions/pre-build-scan
+        with:
+          working-directory: app/frontend
+          report-name: frontend-pre-build-scan
+          sonar-token: ${{ secrets.SONAR_TOKEN }}
+          sonar-host-url: ${{ vars.SONAR_HOST_URL }}
+          sonar-organization: ${{ vars.SONAR_ORGANIZATION }}
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Build the static site
+        run: npm run build
+        env:
+          NEXT_PUBLIC_APP_VERSION: sha-${{ github.sha }}
+
+      # Scan what will be uploaded to S3 (e.g. a secret that leaked into the JS bundle)
+      - name: Post-build scan
+        uses: ./.github/actions/post-build-scan
+        with:
+          scan-type: fs
+          target: app/frontend/out
+          report-name: frontend-post-build-scan

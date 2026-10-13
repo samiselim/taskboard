@@ -1,0 +1,73 @@
+name: Pre-build scan
+description: Scan the code BEFORE building - secrets, vulnerable dependencies, misconfigurations and code quality
+
+inputs:
+  working-directory:
+    description: Folder to scan (e.g. app/backend)
+    required: false
+    default: "."
+  report-name:
+    description: Name of the uploaded Trivy report artifact
+    required: true
+  sonar-token:
+    description: SonarQube token (empty = skip SonarQube)
+    required: false
+    default: ""
+  sonar-host-url:
+    description: SonarQube URL (https://sonarcloud.io for SonarQube Cloud)
+    required: false
+    default: ""
+  sonar-organization:
+    description: SonarQube Cloud organization (empty for a self-hosted SonarQube server)
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    # Secrets in the commits of this push / pull request (needs checkout with fetch-depth: 0)
+    - name: Gitleaks
+      uses: gitleaks/gitleaks-action@v3
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+        GITLEAKS_ENABLE_COMMENTS: "false"
+
+    - name: TruffleHog
+      if: always()
+      uses: trufflesecurity/trufflehog@v3.99.2
+      with:
+        extra_args: --results=verified,unknown
+
+    # Vulnerable dependencies, secrets and misconfigurations (Dockerfile, Kubernetes, Terraform)
+    - name: Trivy
+      if: always()
+      uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+      with:
+        version: v0.75.0
+        scan-type: fs
+        scan-ref: ${{ inputs.working-directory }}
+        scanners: vuln,secret,misconfig
+        severity: HIGH,CRITICAL
+        ignore-unfixed: true
+        exit-code: "1"
+        output: trivy-report.txt
+
+    - name: Upload the Trivy report
+      if: always()
+      uses: actions/upload-artifact@v7
+      with:
+        name: ${{ inputs.report-name }}
+        path: trivy-report.txt
+
+    # Bugs, code smells, coverage + quality gate
+    - name: SonarQube
+      if: ${{ !cancelled() && inputs.sonar-token != '' }}
+      uses: SonarSource/sonarqube-scan-action@v8
+      env:
+        SONAR_TOKEN: ${{ inputs.sonar-token }}
+        SONAR_HOST_URL: ${{ inputs.sonar-host-url }}
+      with:
+        projectBaseDir: ${{ inputs.working-directory }}
+        args: >
+          -Dsonar.qualitygate.wait=true
+          ${{ inputs.sonar-organization != '' && format('-Dsonar.organization={0}', inputs.sonar-organization) || '' }}

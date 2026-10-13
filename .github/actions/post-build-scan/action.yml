@@ -1,0 +1,50 @@
+name: Post-build scan
+description: Scan what was BUILT - a Docker image (+ SBOM) or a build output folder
+
+inputs:
+  scan-type:
+    description: "image (a Docker image) or fs (a folder, e.g. the frontend's out/)"
+    required: true
+  target:
+    description: The image name or the folder to scan
+    required: true
+  report-name:
+    description: Name of the uploaded report artifact
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Trivy
+      uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+      with:
+        version: v0.75.0
+        scan-type: ${{ inputs.scan-type }}
+        image-ref: ${{ inputs.scan-type == 'image' && inputs.target || '' }}
+        scan-ref: ${{ inputs.scan-type == 'fs' && inputs.target || '.' }}
+        scanners: vuln,secret
+        severity: CRITICAL
+        ignore-unfixed: true
+        exit-code: "1"
+        output: trivy-report.txt
+
+    # # SBOM = the list of every package inside the image (keep it with each release)
+    # - name: SBOM
+    #   if: always() && inputs.scan-type == 'image'
+    #   uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+    #   with:
+    #     version: v0.75.0
+    #     scan-type: image
+    #     image-ref: ${{ inputs.target }}
+    #     format: cyclonedx
+    #     output: sbom.cdx.json
+
+    - name: Upload the reports
+      if: always()
+      uses: actions/upload-artifact@v7
+      with:
+        name: ${{ inputs.report-name }}
+        path: |
+          trivy-report.txt
+          sbom.cdx.json
+        if-no-files-found: ignore

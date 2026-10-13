@@ -1,0 +1,71 @@
+# Default values. Environment-specific values: values-local.yaml (minikube) and values-prod.yaml (EKS)
+
+backend:
+  image:
+    repository: taskboard-backend
+    tag: "local"
+    pullPolicy: IfNotPresent
+  replicas: 2
+  environment: local
+  corsOrigins: ""
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      memory: 256Mi
+  service:
+    port: 8000
+
+# Frontend (nginx serving the static site + proxying /api to the backend).
+# LOCAL ONLY: on AWS the frontend is served by S3 + CloudFront, so it stays disabled there.
+frontend:
+  enabled: false
+  image:
+    repository: taskboard-frontend
+    tag: "local"
+    pullPolicy: IfNotPresent
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 32Mi
+    limits:
+      memory: 64Mi
+  service:
+    port: 8080
+
+database:
+  image: postgres:17-alpine
+  name: taskboard
+  storage:
+    size: 5Gi
+    storageClassName: ""        # "" = the cluster's default StorageClass
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
+
+# Database credentials. Choose ONE mode:
+#  1) secret.create=true         -> the chart creates a Secret from these values (local only!)
+#  2) externalSecret.enabled=true -> External Secrets Operator copies them from AWS Secrets Manager
+secret:
+  create: true
+  username: taskboard
+  password: taskboard-local-only
+
+externalSecret:
+  enabled: false
+  region: eu-west-1
+  remoteKey: taskboard/prod/database   # Secrets Manager secret with keys: username, password
+  refreshInterval: 1h
+
+# EKS only: register the backend pods in the ALB target group created by Terraform
+targetGroupBinding:
+  enabled: false
+  targetGroupARN: ""
+
+serviceAccount:
+  create: true

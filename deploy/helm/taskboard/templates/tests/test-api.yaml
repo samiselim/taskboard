@@ -1,0 +1,31 @@
+# `helm test <release>` runs this pod: it creates and reads a task through the API
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ include "taskboard.fullname" . }}-test-api
+  labels:
+    {{- include "taskboard.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: test
+    helm.sh/hook-delete-policy: before-hook-creation   # keep the pod so `helm test --logs` can show its output
+spec:
+  restartPolicy: Never
+  containers:
+    - name: test
+      image: curlimages/curl:8.17.0
+      command:
+        - sh
+        - -c
+        - |
+          set -e
+          URL=http://{{ include "taskboard.fullname" . }}-backend:{{ .Values.backend.service.port }}
+          curl -fsS "$URL/api/health/ready"
+          curl -fsS -X POST "$URL/api/tasks" -H 'Content-Type: application/json' -d '{"title":"helm test"}'
+          curl -fsS "$URL/api/tasks" | grep -q "helm test"
+          echo "API test passed"
+          {{- if .Values.frontend.enabled }}
+          FE=http://{{ include "taskboard.fullname" . }}-frontend:{{ .Values.frontend.service.port }}
+          curl -fsS "$FE/" | grep -q "<title>TaskBoard</title>"
+          curl -fsS "$FE/api/tasks" | grep -q "helm test"
+          echo "Frontend test passed (page served + /api reaches the backend)"
+          {{- end }}
