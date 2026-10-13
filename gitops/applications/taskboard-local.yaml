@@ -11,7 +11,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/CHANGE_ME/taskboard.git   # your repository
+    repoURL: https://github.com/samiselim/taskboard # your repository
     targetRevision: main
     path: deploy/helm/taskboard
     helm:
@@ -22,7 +22,7 @@ spec:
     namespace: taskboard
   syncPolicy:
     automated:
-      prune: true      # something removed from Git is removed from the cluster
-      selfHeal: true   # a manual change in the cluster (kubectl edit/scale) is undone
+      prune: true # something removed from Git is removed from the cluster
+      selfHeal: true # a manual change in the cluster (kubectl edit/scale) is undone
     syncOptions:
       - CreateNamespace=true
